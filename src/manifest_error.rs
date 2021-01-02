@@ -1,13 +1,9 @@
 use failure::Fail;
-use url;
 
 #[derive(Debug, Fail)]
 pub enum ManifestError {
   #[fail(display = "IO Error: {}", e)]
   IO { e: std::io::Error },
-
-  #[fail(display = "Url Parse Error: {}", e)]
-  UrlParseError { e: url::ParseError },
 
   #[fail(display = "Reqwest Error: {}", e)]
   ReqwestError { e: reqwest::Error },
@@ -25,12 +21,6 @@ pub enum ManifestError {
 impl From<std::io::Error> for ManifestError {
   fn from(e: std::io::Error) -> Self {
     ManifestError::IO { e }
-  }
-}
-
-impl From<url::ParseError> for ManifestError {
-  fn from(e: url::ParseError) -> Self {
-    ManifestError::UrlParseError { e }
   }
 }
 
