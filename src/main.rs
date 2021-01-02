@@ -103,8 +103,10 @@ fn request_mod_listing(version: &str) -> Result<HashMap<String, u32>> {
 fn generate_nix_mod_entries(mod_list: Vec<YamlMod>, slug_map: HashMap<String, u32>, version: &str) -> Result<Vec<NixMod>> {
     mod_list.into_iter().map(|yaml_mod: YamlMod| {
         log::info!("Processing mod: {}", yaml_mod.name);
-        let project_id = yaml_mod.id
-            .context(format!("Unable to find the Curse ID for mod {}. If the mod name is correct, try specifying the ID manually.", yaml_mod.name))?;
+        let project_id = match yaml_mod.id {
+            Some(id) => id,
+            None     => *slug_map.get(&yaml_mod.name).context(format!("Unable to find the Curse ID for mod {}. If the mod name is correct, try specifying the ID manually.", yaml_mod.name))?
+        };
         let addon_info = request_addon_info(project_id)?;
 
         fn get_all_files(project_id: u32) -> Result<impl Iterator<Item=CurseModFile>> {
