@@ -2,11 +2,11 @@ use serde::{Serialize, Deserialize};
 use serde_json::json;
 use std::collections::HashSet;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct MinecraftVersion {
     pub version: String
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ModFile {
     #[serde(rename = "projectID")]
     pub project_id: u32,
@@ -14,12 +14,12 @@ pub struct ModFile {
     pub file_id: u32,
     pub required: bool
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct CurseManifest {
     pub minecraft: MinecraftVersion,
     pub files: Vec<ModFile>
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AddonInfo {
     pub name: String,
     #[serde(rename = "websiteUrl")]
@@ -27,7 +27,7 @@ pub struct AddonInfo {
     pub id: u32
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct YamlModFile {
     #[serde(skip_serializing_if="Option::is_none")]
     pub name: Option<String>,
@@ -44,7 +44,7 @@ pub struct YamlModFile {
     pub md5: Option<String>
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct YamlMod {
     pub name: String,
     #[serde(skip_serializing_if="Option::is_none")]
@@ -59,14 +59,14 @@ pub struct YamlMod {
     pub files: Option<Vec<YamlModFile>>
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct YamlManifest {
     pub version: String,
     pub imports: Vec<String>,
     pub mods: Vec<YamlMod>
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum Side {
     Client,
