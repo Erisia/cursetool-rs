@@ -241,3 +241,132 @@ fn main() {
         Mode::FromCurse => generate_yaml_from_curse(&options.input_file, &options.output_file).unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_get_slug_from_url() {
+        let url = "https://www.curseforge.com/minecraft/mc-mods/hunger-overhaul";
+        let result = get_slug_from_webpage_url(url).unwrap();
+
+        assert_eq!(result, "hunger-overhaul");
+    }
+
+    #[test]
+    fn can_get_addon_info() {
+        let project_id = 224476; // Hunger Overhaul
+        let result: AddonInfo = request_addon_info(project_id).unwrap();
+
+        assert_eq!(result.name, "Hunger Overhaul");
+        assert_eq!(result.id, project_id);
+        assert!(result.website_url.contains("hunger-overhaul"));
+    }
+
+    #[test]
+    fn can_generate_yaml() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let manifest_path = dir.path().join("manifest.json");
+        let output_path = dir.path().join("manifest.yaml");
+        write_simple_manifest(&File::create(&manifest_path)?)?;
+        generate_yaml_from_curse(&manifest_path, &output_path)?;
+
+        let generated_manifest: YamlManifest = serde_yaml::from_reader(&File::open(output_path)?)?;
+        assert_eq!(generated_manifest.version, "1.12.2".to_string(), "Version is incorrect");
+        assert_eq!(generated_manifest.mods.len(), 2, "Mod count is incorrect");
+        assert_eq!(generated_manifest.imports.len(), 0, "There should be no imports");
+        assert_eq!(generated_manifest.mods.get(0).unwrap().name, "iron-chests", "Iron Chests should be present");
+        assert_eq!(generated_manifest.mods.get(1).unwrap().name, "jei", "JEI should be present");
+        assert_eq!(generated_manifest.mods.get(0).unwrap().files.as_ref().unwrap()[0].id.unwrap(), 2747935, "File ID should be set");
+
+        Ok(())
+    }
+
+    #[test]
+    fn can_merge_manifests() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let a_manifest_path = dir.path().join("a.yaml");
+        let b_manifest_path = dir.path().join("b.yaml");
+        let c_manifest_path = dir.path().join("c.yaml");
+        
+        write_yaml_manifest(&File::create(&a_manifest_path)?, vec!["b.yaml".to_string(), "c.yaml".to_string()], vec![
+            YamlMod::with_id("jei", 238222),
+            YamlMod::with_name("iron-chests")
+        ])?;
+        write_yaml_manifest(&File::create(&b_manifest_path)?, vec!["c.yaml".to_string()], vec![
+            YamlMod::with_id("iron-chests", 123456)
+        ])?;
+        write_yaml_manifest(&File::create(&c_manifest_path)?, vec![], vec![
+            YamlMod::with_files("waystones", 245755, YamlModFile::with_id(2859589))
+        ])?;
+
+        let merged_manifest: YamlManifest = recursive_manifest_load(&a_manifest_path)?;
+        
+        assert_eq!(merged_manifest.version, "1.12.2", "Should have correct version");
+        assert_eq!(merged_manifest.imports.len(), 0, "Should have no remaining imports");
+        assert_eq!(merged_manifest.mods.len(), 3, "Should exclude duplicates");
+        assert_eq!(merged_manifest.mods.iter().find(|&ref x| x.name == "iron-chests").unwrap().id.is_none(), true, "Higher level manifests should take priority");
+
+        Ok(())
+    }
+
+    fn write_yaml_manifest(file: &File, imports: Vec<String>, mods: Vec<YamlMod>) -> Result<()> {
+        serde_yaml::to_writer(file, &YamlManifest {
+            version: "1.12.2".to_string(),
+            imports,
+            mods
+        })?;
+
+        Ok(())
+    }
+
+    fn write_simple_manifest(file: &File) -> Result<()> {
+        serde_json::to_writer(file, &CurseManifest {
+            minecraft: MinecraftVersion {
+               version: "1.12.2".to_string()
+            },
+            files: vec![
+                // JEI 4.16.1.302
+                ModFile {
+                    project_id: 238222,
+                    file_id: 3043174,
+                    required: true
+                },
+                // Iron Chests 7.0.72.847
+                ModFile {
+                    project_id: 228756,
+                    file_id: 2747935,
+                    required: true
+                }
+            ]
+        })?;
+
+        Ok(())
+    }
+
+    impl YamlMod {
+        fn with_id(name: &str, id: u32) -> YamlMod {
+            YamlMod {
+                name: name.to_owned(),
+                id: Some(id),
+                side: None,
+                required: None,
+                default: None,
+                files: None
+            }
+        }
+
+        fn with_name(name: &str) -> YamlMod {
+            YamlMod {
+                name: name.to_owned(),
+                id: None,
+                side: None,
+                required: None,
+                default: None,
+                files: None
+            }
+        }
+    }
+}
+
