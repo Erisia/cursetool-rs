@@ -306,7 +306,7 @@ mod tests {
         assert_eq!(merged_manifest.version, "1.12.2", "Should have correct version");
         assert_eq!(merged_manifest.imports.len(), 0, "Should have no remaining imports");
         assert_eq!(merged_manifest.mods.len(), 3, "Should exclude duplicates");
-        assert_eq!(merged_manifest.mods.iter().find(|&ref x| x.name == "iron-chests").unwrap().id.is_none(), true, "Higher level manifests should take priority");
+        assert!(merged_manifest.mods.iter().find(|&ref x| x.name == "iron-chests").unwrap().id.is_none(), "Higher level manifests should take priority");
 
         Ok(())
     }
