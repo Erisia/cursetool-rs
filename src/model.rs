@@ -62,7 +62,9 @@ pub struct YamlMod {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct YamlManifest {
     pub version: String,
+    #[serde(default)]
     pub imports: Vec<String>,
+    #[serde(default)]
     pub mods: Vec<YamlMod>
 }
 
