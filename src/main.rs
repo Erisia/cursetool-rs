@@ -4,7 +4,6 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
-use clap::{App, Arg, crate_authors, crate_name, crate_version};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest;
@@ -14,7 +13,9 @@ use sha2::{Digest, Sha256};
 use simplelog::*;
 
 use model::*;
-use options::{Mode, Options};
+use options::Mode;
+
+use crate::options::parse_commandline;
 
 mod options;
 mod model;
@@ -209,36 +210,11 @@ fn get_slug_from_webpage_url(url: &str) -> Result<String> {
 
 fn main() {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap();
-    let matches = App::new(crate_name!())
-        .version(crate_version!())
-        .author(crate_authors!())
-        .arg(Arg::with_name("mode")
-            .required(true)
-            .possible_values(&["curse", "yaml"])
-            .takes_value(true)
-            .help("Whether to convert Curse manifest files to yaml, or yaml to nix.")
-            .next_line_help(true))
-        .arg(Arg::with_name("input")
-            .required(true)
-            .takes_value(true)
-            .help("Path to input file.\n\
-                    Should be a json file in curse mode,\n\
-                    and a yaml file in yaml mode")
-            .next_line_help(true))
-        .arg(Arg::with_name("output")
-            .required(true)
-            .takes_value(true)
-            .help("Path to output file.\n\
-                    Will dump yaml data in curse mode,\n\
-                    and nix data in yaml mode.")
-            .next_line_help(true))
-        .get_matches();
-
-    let options = Options::from_clap(&matches);
+    let options = parse_commandline();
 
     match options.mode {
-        Mode::FromYaml => generate_nix_from_yaml(&options.input_file, &options.output_file).unwrap(),
-        Mode::FromCurse => generate_yaml_from_curse(&options.input_file, &options.output_file).unwrap()
+        Mode::Yaml => generate_nix_from_yaml(&options.input_file, &options.output_file).unwrap(),
+        Mode::Curse => generate_yaml_from_curse(&options.input_file, &options.output_file).unwrap()
     }
 }
 

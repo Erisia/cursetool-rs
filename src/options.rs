@@ -1,28 +1,30 @@
 use std::path::PathBuf;
+use structopt::{StructOpt};
+use structopt::clap::arg_enum;
 
-#[derive(Debug, Clone)]
-pub(crate) enum Mode {
-    FromCurse,
-    FromYaml
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct Options {
+#[derive(Debug, StructOpt)]
+#[structopt(about = "Rust implementation of Cursetool")]
+pub struct Options {
+    #[structopt(help = "Whether to convert Curse manifest files to yaml, or yaml to nix.")]
     pub mode: Mode,
+    #[structopt(help = "Path to input file.\n\
+                    Should be a json file in curse mode,\n\
+                    and a yaml file in yaml mode")]
     pub input_file: PathBuf,
-    pub output_file: PathBuf
+    #[structopt(help = "Path to output file.\n\
+                    Will dump yaml data in curse mode,\n\
+                    and nix data in yaml mode.")]
+    pub output_file: PathBuf,
 }
 
-impl Options {
-    pub fn from_clap(matches: &clap::ArgMatches<'_>) -> Options {
-        Options {
-            mode: match matches.value_of("mode").unwrap() {
-                "curse" => Mode::FromCurse,
-                "yaml" => Mode::FromYaml,
-                _ => Mode::FromCurse
-            },
-            input_file: PathBuf::from(matches.value_of_os("input").unwrap()),
-            output_file: PathBuf::from(matches.value_of_os("output").unwrap())
-        }
+arg_enum! {
+    #[derive(Debug)]
+    pub enum Mode {
+        Curse,
+        Yaml,
     }
+}
+
+pub fn parse_commandline() -> Options {
+    Options::from_args()
 }
