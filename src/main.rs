@@ -4,6 +4,8 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
+use console::style;
+use indicatif::{ProgressBar, ProgressStyle};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest;
@@ -47,14 +49,26 @@ fn generate_yaml_from_curse(curse_manifest_path: &Path, yaml_manifest_path: &Pat
 }
 
 fn generate_nix_from_yaml(yaml_manifest_path: &Path, nix_manifest_path: &Path) -> Result<()> {
+    println!(
+        "{} Loading manifest...",
+        style("[1/4]").bold().dim(),
+    );
     let yaml_manifest: YamlManifest = recursive_manifest_load(yaml_manifest_path)?;
     log::info!("Found {} mods from manifest", yaml_manifest.mods.len());
-    log::info!("Fetching list of every mod for version {} from Curse...", yaml_manifest.version);
+    println!(
+        "{} Fetching list of every mod for version {}",
+        style("[2/4]").bold().dim(),
+        yaml_manifest.version);
     let slug_map = request_mod_listing(&yaml_manifest.version)?; // map of slug -> numeric ID for every mod on Curse
-    log::info!("Identified {} mods from Curse", slug_map.len());
+    println!(
+        "{} Fetching details for {} mods",
+        style("[3/4]").bold().dim(),
+        slug_map.len());
     let mut mod_entries = generate_nix_mod_entries(yaml_manifest.mods, slug_map, &yaml_manifest.version)?;
     mod_entries.sort_unstable_by_key(|m| m.slug.clone());
-    log::info!("Writing out manifest...");
+    println!(
+        "{} Writing out manifest",
+        style("[4/4]").bold().dim());
     let formatted_mods = mod_entries.into_iter().map(|m| m.to_string()).collect::<Vec<_>>().join("\n");
     write!(BufWriter::new(File::create(nix_manifest_path)?),
            r#"{{
@@ -110,8 +124,14 @@ fn request_mod_listing(version: &str) -> Result<HashMap<String, u32>> {
 }
 
 fn generate_nix_mod_entries(mod_list: Vec<YamlMod>, slug_map: HashMap<String, u32>, version: &str) -> Result<Vec<NixMod>> {
-    mod_list.into_iter().map(|yaml_mod: YamlMod| {
-        log::info!("Processing mod: {}", yaml_mod.name);
+    let progress = ProgressBar::new(mod_list.len() as u64)
+        .with_style(ProgressStyle::default_bar()
+            .template("{bar:30} {pos}/{len} {msg}"));
+
+    mod_list.into_iter().map(|yaml_mod| {
+        progress.set_message(&format!("Processing mod: {}", yaml_mod.name));
+        progress.inc(1);
+
         let project_id = match yaml_mod.id {
             Some(id) => id,
             None     => *slug_map.get(&yaml_mod.name).context(format!("Unable to find the Curse ID for mod {}. If the mod name is correct, try specifying the ID manually.", yaml_mod.name))?

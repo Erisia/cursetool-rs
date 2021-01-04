@@ -19,6 +19,8 @@ md5 = "0.7.0"
 anyhow = "1.0.37"
 lazy_static = "1.4.0"
 structopt = "0.3.21"
+indicatif = "0.15.0"
+console = "0.14.0"
 
 [dev-dependencies]
 tempfile = "3.1.0"
