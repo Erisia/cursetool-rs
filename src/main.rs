@@ -24,7 +24,10 @@ static BASE_URL: &str = "https://addons-ecs.forgesvc.net/api/v2";
 
 fn generate_yaml_from_curse(curse_manifest_path: &Path, yaml_manifest_path: &Path) -> Result<()> {
     log::info!("Reading manifest...");
-    let curse_manifest: CurseManifest = serde_json::from_reader(File::open(curse_manifest_path)?)?;
+    let manifest_file = File::open(curse_manifest_path)
+        .context(format!("While opening {:?}", curse_manifest_path))?;
+    let curse_manifest: CurseManifest = serde_json::from_reader(manifest_file)
+        .context(format!("While parsing YAML from {:?}", curse_manifest_path))?;
     log::info!("Found {} mods in Curse manifest", curse_manifest.files.len());
     let mut mod_entries: Vec<YamlMod> = curse_manifest.files.iter().map(|m| {
         generate_yaml_mod_entry(m)
@@ -66,11 +69,16 @@ fn generate_nix_from_yaml(yaml_manifest_path: &Path, nix_manifest_path: &Path) -
 
 fn recursive_manifest_load(manifest_path: &Path) -> Result<YamlManifest> {
     log::info!("Reading manifest file {}...", manifest_path.display());
-    let base_manifest: YamlManifest = serde_yaml::from_reader(File::open(manifest_path)?)?;
+    let manifest_file = File::open(manifest_path)
+        .context(format!("While opening {:?}", manifest_path))?;
+    let base_manifest: YamlManifest = serde_yaml::from_reader(manifest_file)
+        .context(format!("While parsing YAML from {:?}", manifest_path))?;
+
     let mut imported_manifests: Vec<YamlManifest> = Vec::new();
     for import in &base_manifest.imports {
         let relative_path = manifest_path.parent().expect("Base manifest has no parent").join(&import);
-        imported_manifests.push(recursive_manifest_load(&relative_path).expect(&format!("Failed to import yaml file {}, confirm that it exists.", &import)));
+        imported_manifests.push(recursive_manifest_load(&relative_path)
+            .context(format!("While importing yaml file {}", import))?);
     }
     Ok(base_manifest.merge(imported_manifests))
 }
@@ -208,14 +216,18 @@ fn get_slug_from_webpage_url(url: &str) -> Result<String> {
     )
 }
 
-fn main() {
-    TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed).unwrap();
+fn main() -> Result<()> {
+    TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed)?;
     let options = parse_commandline();
 
     match options.mode {
-        Mode::Yaml => generate_nix_from_yaml(&options.input_file, &options.output_file).unwrap(),
-        Mode::Curse => generate_yaml_from_curse(&options.input_file, &options.output_file).unwrap()
+        Mode::Yaml => generate_nix_from_yaml(&options.input_file, &options.output_file)
+            .context("While generating nix from yaml")?,
+        Mode::Curse => generate_yaml_from_curse(&options.input_file, &options.output_file)
+            .context("While generating yaml from curse")?
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
