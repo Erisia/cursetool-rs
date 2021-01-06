@@ -2,7 +2,7 @@
 Basic cursetool reimplementation in Rust, using the unofficial Curse API
 
  - Creates YAML files with pinned versions from a Curse manifest file
-  - Generates a Nix mod description from a YAML manifest
+  - Generates a Nix mod Description from a YAML manifest
 
 ## Getting Started (assuming Nix is installed)
 If you have direnv and lorri set up, you can run `direnv allow` once to set up your environment whenever you enter the directory. Otherwise, use `nix-shell`.

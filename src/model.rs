@@ -1,6 +1,9 @@
 use serde::{Serialize, Deserialize};
 use serde_json::json;
 use std::collections::HashSet;
+use std::path::Path;
+use anyhow::{Result, Context};
+use std::fs::File;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MinecraftVersion {
@@ -66,6 +69,32 @@ pub struct YamlManifest {
     pub imports: Vec<String>,
     #[serde(default)]
     pub mods: Vec<YamlMod>
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CurseModFileInfo {
+    pub md5: String,
+    pub sha256: String,
+    pub size: u64,
+    pub download_url: String,
+}
+
+impl YamlManifest {
+    pub(crate) fn recursive_load_from_file(manifest_path: &Path) -> Result<Self> {
+        log::info!("Reading manifest file {}...", manifest_path.display());
+        let manifest_file = File::open(manifest_path)
+            .context(format!("While opening {:?}", manifest_path))?;
+        let base_manifest: YamlManifest = serde_yaml::from_reader(manifest_file)
+            .context(format!("While parsing YAML from {:?}", manifest_path))?;
+
+        let mut imported_manifests: Vec<YamlManifest> = Vec::new();
+        for import in &base_manifest.imports {
+            let relative_path = manifest_path.parent().expect("Base manifest has no parent").join(&import);
+            imported_manifests.push(Self::recursive_load_from_file(&relative_path)
+                .context(format!("While importing yaml file {}", import))?);
+        }
+        Ok(base_manifest.merge(imported_manifests))
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -188,5 +217,73 @@ impl YamlManifest {
             imports: imports.into_iter().collect(),
             mods: mod_list
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_merge_manifests() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let a_manifest_path = dir.path().join("a.yaml");
+        let b_manifest_path = dir.path().join("b.yaml");
+        let c_manifest_path = dir.path().join("c.yaml");
+
+        write_yaml_manifest(&File::create(&a_manifest_path)?, vec!["b.yaml".to_string(), "c.yaml".to_string()], vec![
+            YamlMod::with_id("jei", 238222),
+            YamlMod::with_name("iron-chests")
+        ])?;
+        write_yaml_manifest(&File::create(&b_manifest_path)?, vec!["c.yaml".to_string()], vec![
+            YamlMod::with_id("iron-chests", 123456)
+        ])?;
+        write_yaml_manifest(&File::create(&c_manifest_path)?, vec![], vec![
+            YamlMod::with_files("waystones", 245755, YamlModFile::with_id(2859589))
+        ])?;
+
+        let merged_manifest = YamlManifest::recursive_load_from_file(&a_manifest_path)?;
+
+        assert_eq!(merged_manifest.version, "1.12.2", "Should have correct version");
+        assert_eq!(merged_manifest.imports.len(), 0, "Should have no remaining imports");
+        assert_eq!(merged_manifest.mods.len(), 3, "Should exclude duplicates");
+        assert!(merged_manifest.mods.iter().find(|&ref x| x.name == "iron-chests").unwrap().id.is_none(), "Higher level manifests should take priority");
+
+        Ok(())
+    }
+
+    impl YamlMod {
+        fn with_id(name: &str, id: u32) -> YamlMod {
+            YamlMod {
+                name: name.to_owned(),
+                id: Some(id),
+                side: None,
+                required: None,
+                default: None,
+                files: None
+            }
+        }
+
+        fn with_name(name: &str) -> YamlMod {
+            YamlMod {
+                name: name.to_owned(),
+                id: None,
+                side: None,
+                required: None,
+                default: None,
+                files: None
+            }
+        }
+    }
+
+    fn write_yaml_manifest(file: &File, imports: Vec<String>, mods: Vec<YamlMod>) -> Result<()> {
+        serde_yaml::to_writer(file, &YamlManifest {
+            version: "1.12.2".to_string(),
+            imports,
+            mods
+        })?;
+
+        Ok(())
     }
 }

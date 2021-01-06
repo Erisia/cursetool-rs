@@ -1,10 +1,11 @@
 use std::path::PathBuf;
-use structopt::{StructOpt};
+
+use structopt::StructOpt;
 use structopt::clap::arg_enum;
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Rust implementation of Cursetool")]
-pub struct Options {
+pub struct Commandline {
     #[structopt(help = "Whether to convert Curse manifest files to yaml, or yaml to nix.")]
     pub mode: Mode,
     #[structopt(help = "Path to input file.\n\
@@ -25,6 +26,6 @@ arg_enum! {
     }
 }
 
-pub fn parse_commandline() -> Options {
-    Options::from_args()
+pub fn parse_commandline() -> Commandline {
+    Commandline::from_args()
 }
