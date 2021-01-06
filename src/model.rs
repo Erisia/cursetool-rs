@@ -214,7 +214,7 @@ impl YamlManifest {
         YamlManifest {
             version: self.version.clone(),
             imports: imports.into_iter().cloned().collect(),
-            mods: mod_list.values().map(|s| (*s).clone()).collect(),
+            mods: mod_list.values().map(|&s| s.clone()).collect(),
         }
     }
 }
