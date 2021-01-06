@@ -7,8 +7,8 @@ use anyhow::{Context, Result};
 use console::style;
 use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
-use serde_json;
-use serde_yaml;
+
+
 use simplelog::*;
 
 use model::*;
@@ -118,7 +118,7 @@ impl<'app> App<'app> {
                 if let Some(id) = file[0].id {
                     get_all_files(project_id)?
                         .into_iter()
-                        .find(|&ref f| f.id == id)
+                        .find(|f| f.id == id)
                         .context(format!("Looking for specific file in {:?}", yaml_mod))?
                 } else {
                     get_newest_file(project_id)?

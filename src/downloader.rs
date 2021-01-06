@@ -25,7 +25,7 @@ pub struct Downloader<'app> {
 }
 
 impl<'app> Downloader<'app> {
-    pub(crate) fn request_mod_file_info(&self, download_url: &String) -> Result<CurseModFileInfo> {
+    pub(crate) fn request_mod_file_info(&self, download_url: &str) -> Result<CurseModFileInfo> {
         let redirected_url = download_url.replace("edge.forgecdn.net", "media.forgecdn.net");
         // We can generally assume files don't change.
         let json = self.database.get_or_put(&redirected_url, &INFINITE_TIMEOUT, || {
@@ -33,7 +33,7 @@ impl<'app> Downloader<'app> {
             let size = reqwest::blocking::get(&redirected_url)?.copy_to(&mut buf)?;
             let md5 = format!("{:x}", md5::compute(&buf));
             let sha256 = format!("{:x}", Sha256::digest(&buf));
-            let mod_info = CurseModFileInfo { md5, sha256, size, download_url: download_url.clone()  };
+            let mod_info = CurseModFileInfo { md5, sha256, size, download_url: download_url.into()  };
             Ok(serde_json::to_string(&mod_info)?)
         })?;
         Ok(serde_json::from_str(&json)?)
@@ -60,7 +60,7 @@ impl<'app> Downloader<'app> {
         }
     }
 
-    fn get_with_builder<F>(&self, url: &String, f: F) -> Result<String> where F: FnOnce(RequestBuilder) -> RequestBuilder {
+    fn get_with_builder<F>(&self, url: &str, f: F) -> Result<String> where F: FnOnce(RequestBuilder) -> RequestBuilder {
         let request = f(self.client.get(url)).build()?;
         let url: String = request.url().as_str().into();
         self.database.get_or_put(&url, &self.cache_timeout, || {
@@ -70,7 +70,7 @@ impl<'app> Downloader<'app> {
         })
     }
 
-    fn get(&self, url: &String) -> Result<String> {
+    fn get(&self, url: &str) -> Result<String> {
         self.get_with_builder(url, |b| b)
     }
 

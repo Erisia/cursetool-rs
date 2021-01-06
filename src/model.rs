@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize};
 use serde_json::json;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::path::Path;
 use anyhow::{Result, Context};
 use std::fs::File;
@@ -145,7 +145,7 @@ r#"    "{slug}" = {{
         "side" = "{side}";
         "required" = {required};
         "default" = {default};
-        "deps" = {deps};
+        "deps = []";
         "filename" = "{filename}";
         "encoded" = "{encoded}";
         "page" = "{page}";
@@ -161,7 +161,6 @@ r#"    "{slug}" = {{
             side = json!(self.side).as_str().unwrap(),
             required = self.required,
             default = self.default,
-            deps = "[]",
             filename = self.filename,
             encoded = self.encoded,
             page = self.page,
@@ -199,23 +198,23 @@ impl YamlMod {
 }
 
 impl YamlManifest {
-    // probably way too much cloning here
     pub fn merge(&self, others: Vec<YamlManifest>) -> YamlManifest {
-        let mut mod_list: Vec<YamlMod> = self.mods.to_owned();
-        let mut imports: HashSet<String> = HashSet::new();
-        for other_manifest in &others {
-            imports.extend(other_manifest.imports.clone().into_iter());
-            for m in &other_manifest.clone().mods {
-                if ! mod_list.clone().into_iter().any(|i: YamlMod| i.name == m.name) {
-                    mod_list.push(m.clone());
-                }
+        let mut mod_list = HashMap::new();
+        let mut imports: HashSet<&String> = HashSet::new();
+        for a_mod in &self.mods {
+            mod_list.entry(&a_mod.name).or_insert(a_mod);
+        }
+        for other in &others {
+            imports.extend(other.imports.iter());
+            for a_mod in &other.mods {
+                mod_list.entry(&a_mod.name).or_insert(a_mod);
             }
         }
 
         YamlManifest {
             version: self.version.clone(),
-            imports: imports.into_iter().collect(),
-            mods: mod_list
+            imports: imports.into_iter().cloned().collect(),
+            mods: mod_list.values().map(|s| (*s).clone()).collect(),
         }
     }
 }
