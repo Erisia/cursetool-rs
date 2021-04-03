@@ -128,7 +128,9 @@ impl<'app> App<'app> {
             };
 
             let CurseModFileInfo { md5, sha256, size, download_url} = self.downloader.request_mod_file_info(&mod_file.download_url)?;
-
+            // Fix filenames and URLs
+            let fixed_filename = mod_file.file_name.replace("(", "").replace(")", "");
+            let fixed_src = download_url.replace("+", "%2B").replace(" ", "+");
             Ok(NixMod {
                 slug: yaml_mod.name.clone(),
                 title: addon_info.name,
@@ -137,12 +139,12 @@ impl<'app> App<'app> {
                 required: yaml_mod.required.unwrap_or(true),
                 default: yaml_mod.default.unwrap_or(true),
                 deps: vec![],
-                filename: mod_file.clone().file_name,
-                encoded: mod_file.file_name,
+                filename: fixed_filename.clone(),
+                encoded: fixed_filename,
                 md5,
                 sha256,
                 size,
-                src: download_url,
+                src: fixed_src,
                 page: addon_info.website_url,
             })
        }).collect::<Result<Vec<NixMod>, _>>()
