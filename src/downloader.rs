@@ -33,7 +33,7 @@ impl<'app> Downloader<'app> {
             let size = reqwest::blocking::get(&redirected_url)?.copy_to(&mut buf)?;
             let md5 = format!("{:x}", md5::compute(&buf));
             let sha256 = format!("{:x}", Sha256::digest(&buf));
-            let mod_info = CurseModFileInfo { md5, sha256, size, download_url: download_url.into()  };
+            let mod_info = CurseModFileInfo { md5, sha256, size, download_url: redirected_url.to_string() };
             Ok(serde_json::to_string(&mod_info)?)
         })?;
         Ok(serde_json::from_str(&json)?)
