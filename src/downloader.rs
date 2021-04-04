@@ -46,7 +46,7 @@ impl<'app> Downloader<'app> {
         let data = self.get(&url)
             .context(format!("Fetching files for project id {}", project_id))?;
         serde_json::from_str(&data)
-            .context("Parsing files list as JSON")
+            .context(format!("Parsing files list as JSON for project id {}", project_id))
     }
 }
 
@@ -117,7 +117,7 @@ impl<'app> Downloader<'app> {
         let data = self.get_with_builder(&url, |b| b)
                 .context(format!("Fetching addon info for project id {}", project_id))?;
         serde_json::from_str(&data)
-                .context("Parsing addon info as JSON")
+                .context(format!("Parsing addon info as JSON for project id {}. Data: {}", project_id, data))
     }
 }
 
