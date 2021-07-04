@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
@@ -57,18 +56,18 @@ impl<'app> App<'app> {
     }
 
     fn generate_nix_from_yaml(&self, yaml_manifest_path: &Path, nix_manifest_path: &Path) -> Result<()> {
-        print_phase(1, 4, "Loading manifest");
+        print_phase(1, 3, "Loading manifest");
         let yaml_manifest = YamlManifest::recursive_load_from_file(yaml_manifest_path)?;
         log::info!("Found {} mods from manifest", yaml_manifest.mods.len());
 
-        print_phase(2, 4, format!("Fetching list of every mod for version {}", yaml_manifest.version));
-        let slug_map = self.downloader.request_mod_listing(&yaml_manifest.version)?; // map of slug -> numeric ID for every mod on Curse
+        //print_phase(2, 4, format!("Fetching list of every mod for version {}", yaml_manifest.version));
+        //let slug_map = self.downloader.request_mod_listing(&yaml_manifest.version)?; // map of slug -> numeric ID for every mod on Curse
 
-        print_phase(3, 4, format!("Fetching details for {} mods", yaml_manifest.mods.len()));
-        let mut mod_entries = self.generate_nix_mod_entries(yaml_manifest.mods, slug_map, &yaml_manifest.version)?;
+        print_phase(2, 3, format!("Fetching details for {} mods", yaml_manifest.mods.len()));
+        let mut mod_entries = self.generate_nix_mod_entries(yaml_manifest.mods, &yaml_manifest.version)?;
         mod_entries.sort_unstable_by_key(|m| m.slug.clone());
 
-        print_phase(4, 4, "Writing out manifest");
+        print_phase(3, 3, "Writing out manifest");
         let formatted_mods = mod_entries.into_iter().map(|m| m.to_string()).collect::<Vec<_>>().join("\n");
         write!(BufWriter::new(File::create(nix_manifest_path)?),
                r#"{{
@@ -81,7 +80,7 @@ impl<'app> App<'app> {
         Ok(())
     }
 
-    fn generate_nix_mod_entries(&self, mod_list: Vec<YamlMod>, slug_map: HashMap<String, u32>, version: &str) -> Result<Vec<NixMod>> {
+    fn generate_nix_mod_entries(&self, mod_list: Vec<YamlMod>, version: &str) -> Result<Vec<NixMod>> {
 
         let progress = ProgressBar::new(mod_list.len() as u64)
             .with_style(ProgressStyle::default_bar()
@@ -91,11 +90,7 @@ impl<'app> App<'app> {
         mod_list.into_par_iter().progress_with(progress).map(|yaml_mod| {
             updater.upgrade().unwrap().set_message(&format!("Processing mod: {}", yaml_mod.name));
 
-            let project_id = match yaml_mod.id {
-                Some(id) => id,
-                None => *slug_map.get(&yaml_mod.name)
-                    .context(format!("Unable to find the Curse ID for mod {}. If the mod name is correct, try specifying the ID manually.", yaml_mod.name))?
-            };
+            let project_id = yaml_mod.id;
             let addon_info = self.downloader.request_addon_info(project_id)?;
 
             let get_all_files = |project_id: u32| -> Result<Vec<CurseModFile>> {

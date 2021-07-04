@@ -50,8 +50,7 @@ pub struct YamlModFile {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct YamlMod {
     pub name: String,
-    #[serde(skip_serializing_if="Option::is_none")]
-    pub id: Option<u32>,
+    pub id: u32,
     #[serde(skip_serializing_if="Option::is_none")]
     pub side: Option<Side>,
     #[serde(skip_serializing_if="Option::is_none")]
@@ -188,7 +187,7 @@ impl YamlMod {
     pub fn with_files(name: &str, id: u32, file: YamlModFile) -> YamlMod {
         YamlMod {
             name: name.to_owned(),
-            id: Some(id),
+            id: id,
             side: None,
             required: None,
             default: None,

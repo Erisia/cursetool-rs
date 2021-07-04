@@ -22,6 +22,7 @@ structopt = "0.3.21"
 console = "0.14.0"
 directories = "3.0.1"
 rayon = "1.5.0"
+zip = "0.5.13"
 
 [dependencies.indicatif]
 version = "0.15.0"

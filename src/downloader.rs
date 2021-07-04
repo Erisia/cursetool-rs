@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
 use reqwest::blocking::{Client, RequestBuilder};
@@ -84,32 +83,6 @@ impl<'app> Downloader<'app> {
                 .context(format!("Extracting slug from {}", url))?
                 .as_str().into()
         )
-    }
-
-    pub(crate) fn request_mod_listing(&self, version: &str) -> Result<HashMap<String, u32>> {
-        const MAX_MOD_COUNT: usize = 10_000;
-        let url = format!("{}/addon/search", BASE_URL);
-        let response: String = self.get_with_builder(
-            &url,
-            |builder| builder.query(&[
-                ("gameId", "432"),
-                ("gameVersion", version),
-                ("sort", "3"),
-                ("sectionId", "6"),
-                ("pageSize", &MAX_MOD_COUNT.to_string())]) // Less than 9000 1.12.2 mods as of 2021-01-01
-        )?;
-        let response: Vec<AddonInfo> = serde_json::from_str(&response)?;
-
-        if response.len() >= MAX_MOD_COUNT {
-            bail!("The first page of results is full, some mods may not be present in list.");
-        }
-        let mut result = HashMap::new();
-        for addon in response {
-            let slug = self.get_slug_from_webpage_url(&addon.website_url)
-                .context(format!("Fetching slug for {:?}", addon))?;
-            result.insert(slug, addon.id);
-        }
-        Ok(result)
     }
 
     pub(crate) fn request_addon_info(&self, project_id: u32) -> Result<AddonInfo> {
