@@ -4,6 +4,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use lazy_static::lazy_static;
 use regex::Regex;
+use reqwest::Url;
 use reqwest::blocking::{Client, RequestBuilder};
 use sha2::{Digest, Sha256};
 
@@ -12,7 +13,9 @@ use crate::model::{AddonInfo, CurseModFile, CurseModFileInfo};
 
 static DEFAULT_TIMEOUT: Duration = Duration::from_secs(86400);
 static INFINITE_TIMEOUT: Duration = Duration::from_secs(86400 * 365);
-static BASE_URL: &str = "https://addons-ecs.forgesvc.net/api/v2";
+lazy_static! {
+    static ref BASE_URL: Url = Url::parse("https://addons-ecs.forgesvc.net/api/v2/").unwrap();
+}
 // TODO: Implement with tokio.
 //static MAX_CONCURRENT_QUERIES: u32 = 2;
 
@@ -25,20 +28,28 @@ pub struct Downloader<'app> {
 
 impl<'app> Downloader<'app> {
     pub(crate) fn request_mod_file_info(&self, download_url: &str) -> Result<CurseModFileInfo> {
-        let redirected_url = download_url.replace("edge.forgecdn.net", "media.forgecdn.net");
+        let mut download_url = Url::parse(download_url)?;
+        // Edge URL don't work, for whatever reason.
+        if let Some(host) = download_url.host_str() {
+            if host == "edge.forgecdn.net" {
+                download_url.set_host(Some("media.forgecdn.net"))?;
+            }
+        } else {
+            anyhow::bail!("download_url missing host part!");
+        }
         // We can generally assume files don't change.
-        let json = self.database.get_or_put(&redirected_url, &INFINITE_TIMEOUT, || {
+        let json = self.database.get_or_put(&download_url.as_str(), &INFINITE_TIMEOUT, || {
             let mut buf: Vec<u8> = vec![];
-            let mut body = reqwest::blocking::get(&redirected_url)?;
+            let mut body = reqwest::blocking::get(download_url.clone())?;
             let content_type = body.headers().get("content-type")
                 .context("Reading content-type")?;
             if content_type == "application/xml" {
-                anyhow::bail!("Miscomputed URL! {} returned XML", redirected_url);
+                anyhow::bail!("Miscomputed URL! {} returned XML", download_url.as_str());
             }
             let size = body.copy_to(&mut buf)?;
             let md5 = format!("{:x}", md5::compute(&buf));
             let sha256 = format!("{:x}", Sha256::digest(&buf));
-            let mod_info = CurseModFileInfo { md5, sha256, size, download_url: redirected_url.to_string() };
+            let mod_info = CurseModFileInfo { md5, sha256, size, download_url: download_url.to_string() };
             Ok(serde_json::to_string(&mod_info)?)
         })?;
         Ok(serde_json::from_str(&json)?)
@@ -47,11 +58,41 @@ impl<'app> Downloader<'app> {
 
 impl<'app> Downloader<'app> {
     pub(crate) fn request_mod_files(&self, project_id: u32) -> Result<Vec<CurseModFile>> {
-        let url = format!("{}/addon/{}/files", BASE_URL, project_id);
-        let data = self.get(&url)
+        let url = BASE_URL
+            .join(&format!("addon/{}/files", project_id))?;
+        let data = self.get(url.clone())
             .context(format!("Fetching files for project id {}", project_id))?;
-        serde_json::from_str(&data)
-            .context(format!("Parsing files list as JSON for project id {}", project_id))
+        let result: Vec<CurseModFile> = serde_json::from_str(&data)
+            .context(format!("Parsing files list as JSON for project id {}", project_id))?;
+        // The URLs returned are not properly URL-encoded.
+        // Specifically, the filename path needs to be encoded.
+        //
+        // Breaking the URL spec, curseforge requires + to be encoded.
+        // This means we need to do the job 'manually'.
+        result
+            .into_iter()
+            .map(|file| {
+                let url = Url::parse(&file.download_url).unwrap();
+                let filename = url.path_segments()
+                    .unwrap()
+                    .last()
+                    .unwrap();
+                // Sometimes the download URL is already encoded, and sometimes not.
+                // This encoder gives working output for the filename.
+                let encoded_filename = urlencoding::encode(
+                    &urlencoding::decode(filename).unwrap());
+                // We now need to construct a new url, *not* re-encoding it.
+                let mut base_url = url.clone();
+                base_url.path_segments_mut().unwrap()
+                    .pop();
+                let fixed_url = Url::parse(
+                    &format!("{}/{}", base_url.as_str(), &encoded_filename)).unwrap();
+                Ok(CurseModFile {
+                    download_url: fixed_url.to_string(),
+                    ..file
+                })
+            })
+        .collect()
     }
 }
 
@@ -65,7 +106,7 @@ impl<'app> Downloader<'app> {
         }
     }
 
-    fn get_with_builder<F>(&self, url: &str, f: F) -> Result<String> where F: FnOnce(RequestBuilder) -> RequestBuilder {
+    fn get_with_builder<F>(&self, url: Url, f: F) -> Result<String> where F: FnOnce(RequestBuilder) -> RequestBuilder {
         let request = f(self.client.get(url)).build()?;
         let url: String = request.url().as_str().into();
         self.database.get_or_put(&url, &self.cache_timeout, || {
@@ -75,7 +116,7 @@ impl<'app> Downloader<'app> {
         })
     }
 
-    fn get(&self, url: &str) -> Result<String> {
+    fn get(&self, url: Url) -> Result<String> {
         self.get_with_builder(url, |b| b)
     }
 
@@ -92,11 +133,14 @@ impl<'app> Downloader<'app> {
     }
 
     pub(crate) fn request_addon_info(&self, project_id: u32) -> Result<AddonInfo> {
-        let url = format!("{}/addon/{}", BASE_URL, project_id);
-        let data = self.get_with_builder(&url, |b| b)
-                .context(format!("Fetching addon info for project id {}", project_id))?;
+        let url = BASE_URL
+            .join(&format!("addon/{}", project_id))?;
+        let data = self.get_with_builder(url.clone(), |b| b)
+                .context(format!("Fetching addon info for project id {}", project_id))
+                .context(format!("From {:?}", url.as_str()))?;
         serde_json::from_str(&data)
                 .context(format!("Parsing addon info as JSON for project id {}. Data: {}", project_id, data))
+                .context(format!("From {}", url.as_str()))
     }
 }
 
