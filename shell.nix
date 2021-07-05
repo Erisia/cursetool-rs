@@ -18,8 +18,6 @@ stdenv.mkDerivation {
     rustNightlyChannel
     rls
     rustup
-    pkg-config
-    openssl.dev
     diffutils
    ];
   RUST_BACKTRACE = 1;

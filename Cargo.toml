@@ -7,7 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reqwest = { version = "0.10.10", features = ["blocking", "json"] }
 log = "0.4.11"
 simplelog = "0.9.0"
 serde = { version = "1.0.118", features = ["derive"] }
@@ -23,6 +22,11 @@ console = "0.14.0"
 directories = "3.0.1"
 rayon = "1.5.0"
 zip = "0.5.13"
+
+[dependencies.reqwest]
+version = "0.10.10"
+default-features = false
+features = ["blocking", "json", "rustls-tls"]
 
 [dependencies.indicatif]
 version = "0.15.0"
