@@ -29,7 +29,13 @@ impl<'app> Downloader<'app> {
         // We can generally assume files don't change.
         let json = self.database.get_or_put(&redirected_url, &INFINITE_TIMEOUT, || {
             let mut buf: Vec<u8> = vec![];
-            let size = reqwest::blocking::get(&redirected_url)?.copy_to(&mut buf)?;
+            let mut body = reqwest::blocking::get(&redirected_url)?;
+            let content_type = body.headers().get("content-type")
+                .context("Reading content-type")?;
+            if content_type == "application/xml" {
+                anyhow::bail!("Miscomputed URL! {} returned XML", redirected_url);
+            }
+            let size = body.copy_to(&mut buf)?;
             let md5 = format!("{:x}", md5::compute(&buf));
             let sha256 = format!("{:x}", Sha256::digest(&buf));
             let mod_info = CurseModFileInfo { md5, sha256, size, download_url: redirected_url.to_string() };
