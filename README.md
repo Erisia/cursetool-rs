@@ -7,11 +7,21 @@ Basic cursetool reimplementation in Rust, using the unofficial Curse API
 ## Getting Started (assuming Nix is installed)
 If you have direnv and lorri set up, you can run `direnv allow` once to set up your environment whenever you enter the directory. Otherwise, use `nix-shell`.
 
+You need to be running Nix with flakes enabled.
+
+## Development
+
+Run `nix develop`, then use Rust / cargo as normal.
+
+Use `nix flake update` to update non-Rust dependencies, and `cargo update` for Rust dependencies.
+You will need to update the cargoSha256 in flake.nix after doing the latter.
+
 ## Usage
 
-Run `cargo run -- <mode> <input> <output>`,
+Run `nix run <path-to-this-dir> <mode> <input> <output>`
 
-or `cargo build` then `target/debug/cursetool-rs <mode> <input> <output>`
+E.g, `nix run cursetool-rs yaml manifest/e30.yml manifest/e30.nix`.
+
 ```
 USAGE:
     cursetool-rs <mode> <input> <output>
