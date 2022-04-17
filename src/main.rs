@@ -90,20 +90,19 @@ impl<'app> App<'app> {
         mod_list.into_par_iter().progress_with(progress).map(|yaml_mod| {
             updater.upgrade().unwrap().set_message(&format!("Processing mod: {}", yaml_mod.name));
 
-            let project_id = yaml_mod.id;
+            let project_id = match yaml_mod.id {
+                Some(id) => id,
+                None => self.downloader.search_id_with_slug(&yaml_mod.name)?
+            };
             let addon_info = self.downloader.request_addon_info(project_id)?;
 
             let get_all_files = |project_id: u32| -> Result<Vec<CurseModFile>> {
-                self.downloader.request_mod_files(project_id)
+                self.downloader.request_mod_files(project_id, version)
                     .context(format!("Fetching files for project id {}", project_id))
             };
 
             let get_newest_file = |project_id: u32| -> Result<CurseModFile> {
-                // Filter out only those files which match the game version.
-                let mut files = get_all_files(project_id)?
-                    .into_iter()
-                    .filter(|f| f.game_version.iter().any(|v| v == version))
-                    .collect::<Vec<CurseModFile>>();
+                let mut files = get_all_files(project_id)?;
                 files.sort_unstable_by_key(|f| f.file_date.clone());
                 Ok(files.last().context(format!("Did not get at least one file for {:?}", yaml_mod))?.clone())
             };
@@ -111,9 +110,7 @@ impl<'app> App<'app> {
             // Get a specific file if one was specified, otherwise the newest.
             let mod_file: CurseModFile = if let Some(ref file) = yaml_mod.files {
                 if let Some(id) = file[0].id {
-                    get_all_files(project_id)?
-                        .into_iter()
-                        .find(|f| f.id == id)
+                    self.downloader.request_mod_file(project_id, id)
                         .context(format!("Looking for specific file in {:?}", yaml_mod))?
                 } else {
                     get_newest_file(project_id)?
@@ -140,7 +137,7 @@ impl<'app> App<'app> {
                 sha256,
                 size,
                 src: fixed_src,
-                page: addon_info.website_url,
+                page: addon_info.links.website_url,
             })
        }).collect::<Result<Vec<NixMod>, _>>()
     }
@@ -172,8 +169,7 @@ impl<'app> App<'app> {
     fn generate_yaml_mod_entry(&self, mod_info: &ModFile) -> Result<YamlMod> {
         log::info!("Fetching data for file {} in project {}", mod_info.file_id, mod_info.project_id);
         let addon_info = self.downloader.request_addon_info(mod_info.project_id)?;
-        let mod_slug = self.downloader.get_slug_from_webpage_url(&addon_info.website_url)?;
-        Ok(YamlMod::with_files(&mod_slug, mod_info.project_id, YamlModFile::with_id(mod_info.file_id)))
+        Ok(YamlMod::with_files(&addon_info.slug, mod_info.project_id, YamlModFile::with_id(mod_info.file_id)))
     }
 }
 
@@ -181,9 +177,12 @@ impl<'app> App<'app> {
 fn main() -> Result<()> {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed)?;
 
+    let api_key = std::fs::read_to_string("APIKEY")
+        .context("Could not find a Curse API key!\nLogin at https://console.curseforge.com/ and save your key in a file named 'APIKEY'.")?;
+
     let commandline = parse_commandline();
     let database = Database::from_filesystem()?;
-    let downloader = Downloader::new(&database);
+    let downloader = Downloader::new(&database, api_key.trim());
 
     let app = App::new(&commandline, &database, &downloader);
 
@@ -200,13 +199,16 @@ mod tests {
         where F: FnOnce(App) -> Result<X> {
         TermLogger::init(LevelFilter::Debug, Config::default(), TerminalMode::Mixed)?;
 
+        let api_key = std::fs::read_to_string("APIKEY")
+            .context("Could not find a Curse API key!\nLogin at https://console.curseforge.com/ and save your key in a file named 'APIKEY'.")?;
+
         let commandline = Commandline {
             mode,
             input_file: input_path,
             output_file: output_path,
         };
         let database = Database::for_tests()?;
-        let downloader = Downloader::new(&database);
+        let downloader = Downloader::new(&database, api_key.trim());
         let app = App::new(&commandline, &database, &downloader);
         f(app)
     }
