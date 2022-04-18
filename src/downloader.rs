@@ -119,9 +119,10 @@ impl<'app> Downloader<'app> {
 }
 
 impl<'app> Downloader<'app> {
-    pub fn new(database: &'app Database, api_key: &str) -> Self {
+    pub fn new(database: &'app Database) -> Self {
+        let api_key = get_api_key().unwrap();
         let mut headers = header::HeaderMap::new();
-        headers.insert("x-api-key", header::HeaderValue::from_str(&api_key).expect("Could not set API key as a header!")));
+        headers.insert("x-api-key", header::HeaderValue::from_str(&api_key).expect("Could not set API key as a header!"));
         Downloader {
             cache_timeout: DEFAULT_TIMEOUT,
             client: Client::builder()
@@ -176,6 +177,13 @@ impl<'app> Downloader<'app> {
     }
 }
 
+fn get_api_key() -> Result<String> {
+    std::env::var("CURSE_API_KEY").map_err(anyhow::Error::from)
+        .or(std::fs::read_to_string("APIKEY"))
+        .context("Get an API key at https://console.curseforge.com/, then save it in a file name APIKEY or set the CURSE_API_KEY env var.")
+        .map(|s| s.trim().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,9 +191,7 @@ mod tests {
     fn with_downloader<F, X>(f: F) -> Result<X>
         where F: FnOnce(Downloader) -> Result<X> {
         let database = Database::for_tests().unwrap();
-        let api_key = std::fs::read_to_string("APIKEY")
-            .context("Could not find a Curse API key!\nLogin at https://console.curseforge.com/ and save your key in a file named 'APIKEY'.")?;
-        f(Downloader::new(&database, api_key.trim()))
+        f(Downloader::new(&database))
     }
 
     #[test]

@@ -173,16 +173,12 @@ impl<'app> App<'app> {
     }
 }
 
-
 fn main() -> Result<()> {
     TermLogger::init(LevelFilter::Info, Config::default(), TerminalMode::Mixed)?;
 
-    let api_key = std::fs::read_to_string("APIKEY")
-        .context("Could not find a Curse API key!\nLogin at https://console.curseforge.com/ and save your key in a file named 'APIKEY'.")?;
-
     let commandline = parse_commandline();
     let database = Database::from_filesystem()?;
-    let downloader = Downloader::new(&database, api_key.trim());
+    let downloader = Downloader::new(&database);
 
     let app = App::new(&commandline, &database, &downloader);
 
@@ -199,16 +195,13 @@ mod tests {
         where F: FnOnce(App) -> Result<X> {
         TermLogger::init(LevelFilter::Debug, Config::default(), TerminalMode::Mixed)?;
 
-        let api_key = std::fs::read_to_string("APIKEY")
-            .context("Could not find a Curse API key!\nLogin at https://console.curseforge.com/ and save your key in a file named 'APIKEY'.")?;
-
         let commandline = Commandline {
             mode,
             input_file: input_path,
             output_file: output_path,
         };
         let database = Database::for_tests()?;
-        let downloader = Downloader::new(&database, api_key.trim());
+        let downloader = Downloader::new(&database);
         let app = App::new(&commandline, &database, &downloader);
         f(app)
     }
