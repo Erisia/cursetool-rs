@@ -121,7 +121,7 @@ impl<'app> Downloader<'app> {
 impl<'app> Downloader<'app> {
     pub fn new(database: &'app Database, api_key: &str) -> Self {
         let mut headers = header::HeaderMap::new();
-        headers.insert("x-api-key", header::HeaderValue::from_str(&api_key).expect(&format!("Invalid API key string: {}", api_key)));
+        headers.insert("x-api-key", header::HeaderValue::from_str(&api_key).expect("Could not set API key as a header!")));
         Downloader {
             cache_timeout: DEFAULT_TIMEOUT,
             client: Client::builder()
