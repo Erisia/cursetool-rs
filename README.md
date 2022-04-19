@@ -9,6 +9,8 @@ If you have direnv and lorri set up, you can run `direnv allow` once to set up y
 
 You need to be running Nix with flakes enabled.
 
+Create a Curse API key at [CFCore](https://console.curseforge.com) and store it in a file named `APIKEY`.
+
 ## Development
 
 Run `nix develop`, then use Rust / cargo as normal.

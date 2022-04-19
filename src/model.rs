@@ -6,6 +6,21 @@ use anyhow::{Result, Context};
 use std::fs::File;
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct CurseWrapper<T> {
+    pub data: T,
+    pub pagination: Option<Pagination>
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Pagination {
+    pub index: u32,
+    #[serde(rename = "pageSize")]
+    pub page_size: u32,
+    #[serde(rename = "resultCount")]
+    pub result_count: u32,
+    #[serde(rename = "totalCount")]
+    pub total_count: u32,
+}
+#[derive(Serialize, Deserialize, Debug)]
 pub struct MinecraftVersion {
     pub version: String
 }
@@ -23,11 +38,16 @@ pub struct CurseManifest {
     pub files: Vec<ModFile>
 }
 #[derive(Serialize, Deserialize, Debug)]
+pub struct AddonLinks {
+    #[serde(rename = "websiteUrl")]
+    pub website_url: String
+}
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AddonInfo {
     pub name: String,
-    #[serde(rename = "websiteUrl")]
-    pub website_url: String,
-    pub id: u32
+    pub slug: String,
+    pub id: u32,
+    pub links: AddonLinks
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -50,7 +70,8 @@ pub struct YamlModFile {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct YamlMod {
     pub name: String,
-    pub id: u32,
+    #[serde(skip_serializing_if="Option::is_none")]
+    pub id: Option<u32>,
     #[serde(skip_serializing_if="Option::is_none")]
     pub side: Option<Side>,
     #[serde(skip_serializing_if="Option::is_none")]
@@ -130,7 +151,7 @@ pub struct CurseModFile {
     pub file_date: String,
     #[serde(rename = "downloadUrl")]
     pub download_url: String,
-    #[serde(rename = "gameVersion")]
+    #[serde(rename = "gameVersions")]
     pub game_version: Vec<String>
 }
 
@@ -187,7 +208,7 @@ impl YamlMod {
     pub fn with_files(name: &str, id: u32, file: YamlModFile) -> YamlMod {
         YamlMod {
             name: name.to_owned(),
-            id: id,
+            id: Some(id),
             side: None,
             required: None,
             default: None,

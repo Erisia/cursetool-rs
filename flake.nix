@@ -34,7 +34,7 @@
 
 	defaultPackage = rustPlatform.buildRustPackage {
 	  pname = "cursetool-rs";
-	  version = "0.1.0";
+	  version = "0.2.0";
 
 	  src = builtins.filterSource
 	    (path: type: type != "symlink" && baseNameOf path != "target")
@@ -42,7 +42,7 @@
 
 	  doCheck = false;  # The tests require internet access.
 
-	  cargoSha256 = "sha256-hNFhxZWxmifopFJij5edtY8FWPLcrZwwt5mEpJGkHAI";
+	  cargoSha256 = "sha256-S87EM/atPVl0gJKo64ieBz3WI6Ed3D3bddamfNWPi54=";
 	};
   });
 }
